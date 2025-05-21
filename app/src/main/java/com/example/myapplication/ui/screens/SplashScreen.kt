@@ -1,35 +1,52 @@
-// SplashScreen.kt
 package com.example.myapplication.ui.screens
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import android.net.Uri
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
-import com.example.myapplication.R
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 
+@UnstableApi
 @Composable
-fun SplashScreen(onSplashFinished: () -> Unit) {
-    LaunchedEffect(Unit) {
-        delay(2000) // Show splash for 2 seconds
-        onSplashFinished()
+fun SplashScreen(onFinish: () -> Unit) {
+    val context = LocalContext.current
+
+    // Initialize player only once
+    val player = remember {
+        ExoPlayer.Builder(context).build().apply {
+            val videoUri = Uri.parse("android.resource://${context.packageName}/raw/netflix_animation")
+            setMediaItem(MediaItem.fromUri(videoUri))
+            prepare()
+            playWhenReady = true
+        }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black),
-        contentAlignment = Alignment.Center
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.netflix_logo), // replace with your real logo
-            contentDescription = "Netflix Logo",
-            modifier = Modifier.size(150.dp)
-        )
+    // Finish after video or fixed delay
+    LaunchedEffect(Unit) {
+        delay(3000)
+        onFinish()
+        player.release()
     }
+
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = {
+            PlayerView(it).apply {
+                useController = false
+                this.player = player
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM // 👈 this makes it "cover"
+                layoutParams = android.view.ViewGroup.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+        }
+    )
 }

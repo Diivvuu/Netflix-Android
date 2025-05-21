@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myapplication.R
 import com.example.myapplication.ui.theme.NetflixRed
+import com.example.myapplication.ui.components.NetflixHeader
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,9 +66,16 @@ fun OnboardingScreen(
 
     Box(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .background(Color.White)
     ) {
+        // Netflix Header
+        NetflixHeader(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 48.dp)
+        )
+
         // Background Image with swipe gesture
         Box(
             modifier = Modifier
@@ -113,7 +121,6 @@ fun OnboardingScreen(
                         modifier = Modifier
                             .width(300.dp)
                             .height(300.dp)
-                            // .padding(16.dp)
                     )
                 }
             }
@@ -132,11 +139,12 @@ fun OnboardingScreen(
                 enter = fadeIn(tween(500)),
                 exit = fadeOut(tween(500))
             ) {
+                
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.Black.copy(alpha = 0.4f))
+                        .clip(RoundedCornerShape(12.dp))
+//                        .background(Color.Black.copy(alpha = 0.3f))
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -145,7 +153,7 @@ fun OnboardingScreen(
                         fontSize = 26.sp,
                         fontWeight = FontWeight.SemiBold,
                         lineHeight = 32.sp,
-                        color = Color.White,
+                        color = Color.Black,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -154,7 +162,7 @@ fun OnboardingScreen(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Normal,
                         lineHeight = 22.sp,
-                        color = Color.White.copy(alpha = 0.75f),
+                        color = Color.Black.copy(alpha = 0.75f),
                         textAlign = TextAlign.Center
                     )
                 }
