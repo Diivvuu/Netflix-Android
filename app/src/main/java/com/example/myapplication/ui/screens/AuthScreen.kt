@@ -39,12 +39,12 @@ import com.example.myapplication.R
 import com.example.myapplication.ui.theme.NetflixRed
 import androidx.compose.foundation.isSystemInDarkTheme
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.tasks.Task
@@ -58,6 +58,7 @@ import java.io.IOException
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import android.widget.Toast
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +66,7 @@ fun AuthScreen(
     onNavigateBack: () -> Unit,
     isSignIn: Boolean = true
 ) {
+    var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
@@ -88,6 +90,81 @@ fun AuthScreen(
         .build()
 
     val googleSignInClient = GoogleSignIn.getClient(activity, gso)
+
+    fun handleAuthWithEmail(email : String, password : String, isSignIn : Boolean, onSuccess : () -> Unit, onError  : (String) -> Unit){
+        coroutineScope.launch{
+            isLoading  = true
+            errorMessage = null
+            try {
+                val client = OkHttpClient()
+                val mediaType = "application/json; charset=utf-8".toMediaType()
+                val bodyString = if(isSignIn) {
+                    """
+                    {
+                        "email": "${email.trim()}",
+                        "password": "$password"
+                    }
+                    """
+                } else {
+                    """{
+                        "email" : "${email.trim()}",
+                        "password" : "$password",
+                        "name" : "${username.trim()}"
+                    }"""
+                }
+                val body = bodyString.trimIndent().toRequestBody(mediaType)
+//                val body = """
+//                    {
+//                    "email" : "${email.trim()}",
+//                    "password" : "$password
+//                    }
+//                """.trimIndent().toRequestBody(mediaType)
+
+                val endpoint = if(isSignIn) "signin" else "signup"
+                val request = Request.Builder().url("http://10.0.2.2:3000/api/auth/$endpoint").post(body).build()
+
+                client.newCall(request).enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        coroutineScope.launch {
+                            isLoading = false
+                            onError("Network error: ${e.message}")
+                            Toast.makeText(context, "Network error: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+
+                    override  fun onResponse(call : Call, response : Response) {
+                        coroutineScope.launch{
+                            isLoading = false
+                            if(response.isSuccessful){
+                                val responseBody = response.body?.string()
+                                Log.d("BACKEND_RESPONSE", responseBody ?: "No Body")
+                                Toast.makeText(context, if (isSignIn) "Sign in successful!" else "Account Created!", Toast.LENGTH_SHORT).show()
+                                val token = try {
+                                    JSONObject(responseBody ?: "").optString("token")
+                                } catch (e : Exception){ "" }
+                                val prefs = context.getSharedPreferences("app_refs", Context.MODE_PRIVATE)
+                                prefs.edit().putString("auth_token", token).apply()
+                                val intent = Intent(context, ProfilesActivity::class.java)
+                                context.startActivity(intent)
+                                activity.finish()
+                                onSuccess()
+                            }else {
+                                onError("Server error : ${response.code}")
+                                Toast.makeText(context, "Server error: ${response.code}", Toast.LENGTH_LONG).show()
+                                Log.e("BACKEND_CALL", "Error: ${response.code}")
+                            }
+                        }
+                    }
+                })
+            } catch (e : Exception){
+                coroutineScope.launch {
+                    isLoading = false
+                    onError("Error: ${e.message}")
+                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -130,7 +207,16 @@ fun AuthScreen(
                                         val responseBody = response.body?.string()
                                         Log.d("BACKEND_RESPONSE", responseBody ?: "No body")
                                         Toast.makeText(context, "Successfully signed in!", Toast.LENGTH_SHORT).show()
-                                        // TODO: Navigate to main screen or handle successful login
+                                        val token = try {
+                                            JSONObject(responseBody ?: "").optString("token")
+                                        } catch (e :Exception){""}
+
+                                        val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                                        prefs.edit().putString("auth_token", token).apply()
+
+                                        val intent = Intent(context, ProfilesActivity::class.java)
+                                        context.startActivity(intent)
+                                        activity.finish()
                                     } else {
                                         errorMessage = "Server error: ${response.code}"
                                         Toast.makeText(context, "Server error: ${response.code}", Toast.LENGTH_LONG).show()
@@ -188,7 +274,28 @@ fun AuthScreen(
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
             }
-
+            if(currentMode == "Sign Up") {
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = {username = it},
+                    label = {Text("Name", color = textColor)},
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = iconColor)
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Next
+                    ),
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        focusedBorderColor = NetflixRed,
+                        focusedLabelColor = NetflixRed,
+                        cursorColor = NetflixRed,
+                        focusedTextColor = textColor,
+                        unfocusedBorderColor = if(isDarkTheme) Color.White.copy(alpha = 0.5f) else Color.Gray
+                    )
+                )
+            }
             // Email Field
             OutlinedTextField(
                 value = email,
@@ -251,7 +358,23 @@ fun AuthScreen(
             Button(
                 onClick = {
                     isLoading = true
-                    // TODO: implement login/signup logic
+                    errorMessage = null
+                    if(email.isBlank() || password.isBlank()){
+                        isLoading = false
+                        errorMessage = "Email and password cannot be empty"
+                        return@Button
+                    }
+                    handleAuthWithEmail(
+                        email = email,
+                        password = password,
+                        isSignIn = currentMode == "Sign In",
+                        onSuccess = {
+
+                        },
+                        onError = {msg ->
+                            errorMessage = msg
+                        }
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
