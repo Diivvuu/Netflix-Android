@@ -35,6 +35,10 @@
             android:label="Profiles" />
         <activity android:name=".ui.screens.AddProfileActivity"/>
         <activity android:name=".ui.screens.EditProfileActivity"/>
+        <activity android:name=".ui.screens.GenreSelectionActivity" />
+        <activity android:name=".ui.screens.NetflixMainActivity" />
+        <activity android:name=".ui.screens.VideoDetailActivity"/>
+        <activity android:name=".ui.screens.YouTubeFullscreenActivity"/>
 
     </application>
 

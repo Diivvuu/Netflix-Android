@@ -1,9 +1,11 @@
+// NetflixHeader.kt
 package com.example.myapplication.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,10 +23,12 @@ fun NetflixHeader(
     title: String? = null,
     showBackButton: Boolean = false,
     onBackClick: (() -> Unit)? = null,
+    showLogoutButton: Boolean = true,
+    onLogoutClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val isDarkTheme = isSystemInDarkTheme()
-    val textColor = if (isDarkTheme) Color.White else Color.Black
+    val textColor = if (isDarkTheme) Color.White else Color.White
 
     Box(
         modifier = modifier
@@ -61,8 +65,22 @@ fun NetflixHeader(
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = textColor,
-                modifier = Modifier.align(Alignment.CenterEnd)
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = if (showLogoutButton) 48.dp else 0.dp)
             )
         }
+
+        // Logout Button (top right)
+        if (showLogoutButton && onLogoutClick != null) {
+            IconButton(
+                onClick = onLogoutClick,
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Logout,
+                    contentDescription = "Logout",
+                    tint = textColor
+                )
+            }
+        }
     }
-} 
+}

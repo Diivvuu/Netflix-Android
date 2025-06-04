@@ -1,13 +1,18 @@
 package com.example.myapplication.ui.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.myapplication.ui.model.GenreResponse
 import com.example.myapplication.ui.model.Profile
 import com.example.myapplication.ui.network.ProfileRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 
 class ProfilesViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -26,10 +31,27 @@ class ProfilesViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val result = ProfileRepository.fetchProfiles(token)
             _isLoading.value = false
-            result.onSuccess { _profiles.value = it }
-                .onFailure { _error.value = it.message }
+            result.onSuccess { profilesList ->
+                // --- LOG ALL PROFILES HERE ---
+                Log.d("Profiles", "Fetched ${profilesList.size} profiles:")
+                profilesList.forEachIndexed { idx, profile ->
+                    Log.d("Profiles", "[$idx] Name: ${profile.name}, Id: ${profile.id}, AvatarUrl: ${profile.avatarUrl}")
+                }
+                // ----------------------------
+                _profiles.value = profilesList
+            }.onFailure {
+                _error.value = it.message
+            }
         }
     }
+
+    suspend fun fetchProfileGenres(token: String, profileId: String): GenreResponse? {
+        _isLoading.value = true
+        val result = ProfileRepository.fetchProfileGenres(token, profileId)
+        _isLoading.value = false
+        return result.getOrNull()
+    }
+
 
     fun deleteProfile(token: String, profile: Profile) {
         _isLoading.value = true

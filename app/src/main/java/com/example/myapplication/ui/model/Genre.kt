@@ -1,4 +1,7 @@
 package com.example.myapplication.ui.model
 
-class Genre {
-}
+data class Genre (
+    val id : String,
+    val name : String,
+    val tmdbId : Int
+)

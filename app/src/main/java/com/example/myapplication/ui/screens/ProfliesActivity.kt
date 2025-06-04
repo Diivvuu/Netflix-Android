@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -38,6 +40,7 @@ import com.example.myapplication.ui.model.Profile
 import com.example.myapplication.ui.viewmodel.ProfilesViewModel
 import com.google.accompanist.flowlayout.FlowMainAxisAlignment
 import com.google.accompanist.flowlayout.FlowRow
+import kotlinx.coroutines.launch
 
 class ProfilesActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,9 +53,19 @@ class ProfilesActivity : ComponentActivity() {
             return
         }
 
+
+
         setContent {
             val viewModel: ProfilesViewModel = viewModel()
             var shouldRefresh by remember { mutableStateOf(false) }
+
+            val addProfileLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.StartActivityForResult()
+            ) { result ->
+                if(result.resultCode == Activity.RESULT_OK) {
+                    shouldRefresh = true
+                }
+            }
 
             // ActivityResult launcher
             val editProfileLauncher = rememberLauncherForActivityResult(
@@ -67,6 +80,9 @@ class ProfilesActivity : ComponentActivity() {
             ProfilesScreen(
                 token = token,
                 viewModel = viewModel,
+                onAddProfile = {
+                    addProfileLauncher.launch(Intent(this, AddProfileActivity::class.java))
+                },
                 onEditProfile = { profileId ->
                     val intent = Intent(this, EditProfileActivity::class.java)
                     intent.putExtra("profileId", profileId)
@@ -90,6 +106,7 @@ class ProfilesActivity : ComponentActivity() {
 fun ProfilesScreen(
     token: String,
     viewModel: ProfilesViewModel,
+    onAddProfile : () -> Unit,
     onEditProfile: (String) -> Unit,
     onLogout: () -> Unit,
     shouldRefresh: Boolean,
@@ -102,6 +119,34 @@ fun ProfilesScreen(
     var profileToDelete by remember { mutableStateOf<Profile?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    fun onProfileSelected(profile : Profile) {
+
+        scope.launch {
+            try {
+                val genreResponse = viewModel.fetchProfileGenres(token, profile.id);
+                val hasMovieGenres = genreResponse?.movieGenreIds?.isNotEmpty() == true
+                val hasTvGenres = genreResponse?.tvGenreIds?.isNotEmpty() == true
+                Log.d("RESPONSE", hasMovieGenres.toString())
+                Log.d("RESPONSE", hasTvGenres.toString())
+                Log.d("RESPONSE", genreResponse.toString())
+//                val context = LocalContext.current
+
+                if(!hasMovieGenres && !hasTvGenres) {
+                    val intent = Intent(context, GenreSelectionActivity::class.java)
+                    intent.putExtra("profileId", profile.id)
+                    context.startActivity(intent)
+                }
+                else {
+                    val intent = Intent(context, NetflixMainActivity::class.java)
+                    intent.putExtra("profileId", profile.id)
+                    context.startActivity(intent)
+                }
+            }catch (e : Exception) {
+//                Toast.makeText(FAiled, "", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     fun onDeleteProfile(profile: Profile) {
         viewModel.deleteProfile(token, profile)
@@ -120,10 +165,11 @@ fun ProfilesScreen(
         containerColor = Color(0xFF141414),
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {
-                    context.startActivity(Intent(context, AddProfileActivity::class.java))
+                onClick = {onAddProfile()},
+//                    addProfileLauncher.launch(Intent(context, AddProfileActivity::class.java))
+//                    context.startActivity(Intent(context, AddProfileActivity::class.java))
 //                    (context as? Activity)?.finish()
-                },
+//                },
                 containerColor = Color.Red,
                 contentColor = Color.White
             ) {
@@ -137,7 +183,11 @@ fun ProfilesScreen(
                 .background(Color(0xFF141414)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            NetflixHeader()
+            NetflixHeader(
+                showLogoutButton = true,
+                onLogoutClick = onLogout
+            )
+
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -172,9 +222,12 @@ fun ProfilesScreen(
                         mainAxisAlignment = FlowMainAxisAlignment.Center
                     ) {
                         profiles.forEach { profile ->
+                            Log.d("Profiles", profile.name)
+                            Log.d("Profiles", profile.id)
+                            Log.d("Profiles", profile.avatarUrl)
                             ProfileItem(
                                 profile = profile,
-                                onClick = { /* TODO */ },
+                                onClick = { onProfileSelected(profile) },
                                 onEditClick = {
                                     onEditProfile(profile.id)
                                 },
@@ -235,18 +288,20 @@ fun ProfileItem(
             modifier = Modifier.fillMaxSize()
             ) {
             if (profile.avatarUrl.isNotBlank()) {
+                Log.d(profile.avatarUrl, "RESPONSE_AVATAR")
                 AsyncImage(
-                    model = profile.avatarUrl,
+                    model = if (profile.avatarUrl.isNullOrBlank()) "https://picsum.photos/200" else profile.avatarUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(100.dp)
                         .clip(CircleShape)
-                        .background(
-                            brush = Brush.linearGradient(
-                                listOf(Color(0xFF24243e), Color(0xFF141E30))
-                            )
-                        )
+//                        .background(
+//                            brush = Brush.linearGradient(
+//                                listOf(Color(0xFF24243e), Color(0xFF141E30))
+//                            )
+//                        )
+//                    error = painterResource
                 )
             } else {
                 Box(

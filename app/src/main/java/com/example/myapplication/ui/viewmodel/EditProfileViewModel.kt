@@ -161,4 +161,77 @@ class EditProfileViewModel : ViewModel() {
             }
         }
     }
+    fun uploadAvatarAndReload(context: Context, uri: Uri, token: String, profileId: String) {
+        viewModelScope.launch {
+            _isUploading.value = true
+            _uploadError.value = null
+            try {
+                val s3Key = withContext(Dispatchers.IO) {
+                    val fileName = "avatar_${System.currentTimeMillis()}.jpg"
+                    val fileType = "image/jpeg"
+                    val requestJson = JSONObject().apply {
+                        put("fileName", fileName)
+                        put("fileType", fileType)
+                        put("folder", "avatars")
+                    }
+                    val s3UrlRes = OkHttpClient().newCall(
+                        Request.Builder()
+                            .url("http://10.0.2.2:3000/api/upload/upload-url")
+                            .addHeader("Authorization", "Bearer $token")
+                            .post(requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                            .build()
+                    ).execute()
+                    val s3UrlJson = JSONObject(s3UrlRes.body?.string() ?: "")
+                    val uploadUrl = s3UrlJson.getString("url")
+                    val s3Key = s3UrlJson.getString("key")
+                    // Read image bytes
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                    val bytes = inputStream?.readBytes()
+                    inputStream?.close()
+                    if (bytes == null || bytes.isEmpty()) throw Exception("Failed to read image")
+                    // Upload to S3
+                    val putRes = OkHttpClient().newCall(
+                        Request.Builder()
+                            .url(uploadUrl)
+                            .put(bytes.toRequestBody("image/jpeg".toMediaType()))
+                            .build()
+                    ).execute()
+                    if (!putRes.isSuccessful) throw Exception("Failed to upload image")
+                    s3Key
+                }
+                // Save key in DB and reload profile
+                updateAvatarKey(context, profileId, token, s3Key)
+                loadProfile(context, profileId, token)
+            } catch (e: Exception) {
+                _uploadError.value = "Image upload failed: ${e.message}"
+            } finally {
+                _isUploading.value = false
+            }
+        }
+    }
+
+    private fun updateAvatarKey(context: Context, profileId: String, token: String, key: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val json = JSONObject().apply {
+                    put("avatarUrl", key)
+                }
+                val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+                OkHttpClient().newCall(
+                    Request.Builder()
+                        .url("http://10.0.2.2:3000/api/profiles/$profileId")
+                        .addHeader("Authorization", "Bearer $token")
+                        .put(body)
+                        .build()
+                ).execute()
+            }
+        }
+    }
+
+    fun removeAvatarAndReload(context: Context, profileId: String, token: String) {
+        viewModelScope.launch {
+            updateAvatarKey(context, profileId, token, "")
+            loadProfile(context, profileId, token)
+        }
+    }
 }

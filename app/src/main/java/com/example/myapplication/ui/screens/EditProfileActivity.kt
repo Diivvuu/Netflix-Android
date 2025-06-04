@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.screens
 
+import android.app.Activity
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
@@ -57,8 +58,12 @@ class EditProfileActivity : ComponentActivity() {
                 EditProfileScreen(
                     profileId = profileId,
                     viewModel = viewModel,
-                    onProfileUpdated = { finish() },
-                    onBackPressed = { finish() }
+                    onProfileUpdated = {
+                        setResult(Activity.RESULT_OK)
+                        finish() },
+                    onBackPressed = {
+                        setResult(Activity.RESULT_OK)
+                        finish() }
                 )
             }
         }
@@ -90,21 +95,19 @@ fun EditProfileScreen(
             val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
             val token = prefs.getString("auth_token", null) ?: ""
             if (uri != null && token.isNotBlank()) {
-                viewModel.uploadAvatar(context, uri, token)
+                viewModel.uploadAvatarAndReload(context, uri, token, profileId)
             }
         }
     )
 
-    // Fetch once on load
+    // Fetch once on load or after change
     LaunchedEffect(profileId) {
         val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
         val token = prefs.getString("auth_token", null) ?: ""
         viewModel.loadProfile(context, profileId, token)
     }
 
-    BackHandler(enabled = true) {
-        onBackPressed()
-    }
+    BackHandler(enabled = true) { onBackPressed() }
 
     Scaffold(
         topBar = {
@@ -135,9 +138,9 @@ fun EditProfileScreen(
             } else {
                 // Avatar Image + Change/Remove Buttons
                 Box(contentAlignment = Alignment.Center) {
-                    if (avatarUrl.isNotBlank()) {
+                    if (!avatarUrl.isNullOrBlank()) {
                         AsyncImage(
-                            model = "https://kndole-dev-safe.s3.amazonaws.com/$avatarUrl",
+                            model = avatarUrl,
                             contentDescription = "Avatar",
                             modifier = Modifier.size(96.dp).clip(CircleShape)
                         )
@@ -162,9 +165,13 @@ fun EditProfileScreen(
                         enabled = !isUploading,
                         colors = ButtonDefaults.buttonColors(containerColor = NetflixRed)
                     ) { Text("Change Image", color = Color.White) }
-                    if (avatarUrl.isNotBlank()) {
+                    if (!avatarUrl.isNullOrBlank()) {
                         Button(
-                            onClick = { viewModel.removeAvatar() },
+                            onClick = {
+                                val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                                val token = prefs.getString("auth_token", null) ?: ""
+                                viewModel.removeAvatarAndReload(context, profileId, token)
+                            },
                             enabled = !isUploading,
                             colors = ButtonDefaults.buttonColors(containerColor = NetflixDarkGray)
                         ) { Text("Remove", color = Color.White) }
@@ -234,6 +241,7 @@ fun EditProfileScreen(
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
